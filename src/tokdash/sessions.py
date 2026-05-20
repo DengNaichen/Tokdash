@@ -430,8 +430,13 @@ def _load_claude_sessions(signature: tuple[tuple[str, int, int], ...]) -> Dict[s
 
 
 def _claude_sessions() -> Dict[str, Dict[str, Any]]:
-    root = Path.home() / ".claude" / "projects"
-    return _load_claude_sessions(_iter_file_signatures(root))
+    all_sigs: list[tuple[str, int, int]] = []
+    for claude_dir in sorted(Path.home().glob(".claude*")):
+        projects_dir = claude_dir / "projects"
+        if projects_dir.is_dir():
+            all_sigs.extend(_iter_file_signatures(projects_dir))
+    all_sigs.sort(key=lambda item: item[0])
+    return _load_claude_sessions(tuple(all_sigs))
 
 
 def _opencode_db_signature() -> tuple[str, int, int] | None:

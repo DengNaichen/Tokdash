@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+## 0.2.7 - 2026-05-20
+
+### Added
+- Added local benchmark scripts for parser-cache and API endpoint latency checks.
+
+### Fixed
+- Included all local `.claude*` project directories when parsing Claude Code usage and session drill-down data, so alternate Claude installs are counted with the default `~/.claude/projects` logs.
+
 ## 0.2.6 - 2026-05-11
 
 ### Changed

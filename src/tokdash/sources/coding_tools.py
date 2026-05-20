@@ -357,7 +357,11 @@ class ClaudeParser(BaseParser):
 
     def __init__(self, pricing_db: PricingDatabase):
         super().__init__(pricing_db)
-        self.projects_dir = Path.home() / ".claude/projects"
+        self.projects_dirs = [
+            p / "projects"
+            for p in sorted(Path.home().glob(".claude*"))
+            if (p / "projects").is_dir()
+        ]
 
     @staticmethod
     def _infer_provider(model: str) -> str:
@@ -371,7 +375,15 @@ class ClaudeParser(BaseParser):
         return ""
 
     def _file_signatures(self) -> tuple:
-        return _timed_sigs(f"claude:{self.projects_dir}", lambda: _rglob_sigs(self.projects_dir))
+        all_sigs = []
+        for projects_dir in self.projects_dirs:
+            all_sigs.extend(
+                _timed_sigs(
+                    f"claude:{projects_dir}",
+                    lambda d=projects_dir: _rglob_sigs(d),
+                )
+            )
+        return tuple(sorted(all_sigs))
 
     def _parse_all(self) -> List[Dict[str, Any]]:
         out: List[Dict[str, Any]] = []
