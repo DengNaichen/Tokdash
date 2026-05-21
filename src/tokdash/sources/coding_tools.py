@@ -457,14 +457,15 @@ class GeminiCLIParser(BaseParser):
     ========================================================================
     GEMINI CLI SESSION FILE SCHEMA (fixture-friendly notes)
     ========================================================================
-    Location: ~/.gemini/tmp/<projectHash>/chats/session-*.json
+    Location: ~/.gemini/tmp/<projectHash>/chats/session-*.json or session-*.jsonl
 
     Top-level fields:
       - sessionId: UUID string
       - projectHash: SHA256-like hex string (per-project hash)
       - startTime: ISO 8601 timestamp (e.g., "2026-01-03T12:02:18.267Z")
       - lastUpdated: ISO 8601 timestamp
-      - messages: array of message objects
+      - messages: array of message objects in JSON files; one message object per
+        line in JSONL files
 
     Message object schema (type="gemini" only has tokens):
       - id: UUID string (unique per message, use for dedup)
@@ -498,7 +499,7 @@ class GeminiCLIParser(BaseParser):
     FUTURE DATA-SHAPE UPDATES:
     - If token field names change, add fallback aliases in _build_entry()
     - If new token types are added, map to existing fields or add new
-    - If session file location changes, update glob pattern in collect()
+    - If session file location changes, update glob pattern in _file_signatures()
     ========================================================================
     """
 
@@ -529,23 +530,48 @@ class GeminiCLIParser(BaseParser):
         }
 
     def _file_signatures(self) -> tuple:
-        pattern = str(self.gemini_root / "tmp" / "*" / "chats" / "session-*.json")
-        return _timed_sigs(f"gemini:{self.gemini_root}", lambda: _glob_sigs(pattern))
+        def scan() -> tuple:
+            json_pattern = str(self.gemini_root / "tmp" / "*" / "chats" / "session-*.json")
+            jsonl_pattern = str(self.gemini_root / "tmp" / "*" / "chats" / "session-*.jsonl")
+            return tuple(sorted(_glob_sigs(json_pattern) + _glob_sigs(jsonl_pattern)))
+
+        return _timed_sigs(f"gemini:{self.gemini_root}", scan)
+
+    @staticmethod
+    def _iter_messages(path_str: str) -> List[Dict[str, Any]]:
+        path = Path(path_str)
+        if path.suffix == ".jsonl":
+            messages: List[Dict[str, Any]] = []
+            with path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(obj, dict):
+                        messages.append(obj)
+            return messages
+
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        messages = data.get("messages") if isinstance(data, dict) else None
+        return messages if isinstance(messages, list) else []
 
     def _parse_all(self) -> List[Dict[str, Any]]:
         out: List[Dict[str, Any]] = []
         seen_ids = set()
         for path_str, _, _ in self._file_signatures():
             try:
-                with open(path_str, "r", encoding="utf-8") as f:
-                    data = json.load(f)
+                messages = self._iter_messages(path_str)
             except Exception:
-                continue
-            messages = data.get("messages")
-            if not isinstance(messages, list):
                 continue
             for msg in messages:
                 try:
+                    if not isinstance(msg, dict):
+                        continue
                     if msg.get("type") != "gemini":
                         continue
                     tokens = msg.get("tokens")

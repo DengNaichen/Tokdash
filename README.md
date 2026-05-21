@@ -85,7 +85,7 @@ Nothing is uploaded; nothing is read from your machine.
 - **OpenCode**: `~/.local/share/opencode/`
 - **Codex**: `~/.codex/sessions/`
 - **Claude Code**: `~/.claude/projects/`
-- **Gemini CLI**: `~/.gemini/tmp/*/chats/session-*.json`
+- **Gemini CLI**: `~/.gemini/tmp/*/chats/session-*.json` and `session-*.jsonl`
 - **OpenClaw**: `~/.openclaw/agents/*/sessions/`
 - **Kimi CLI**: `~/.kimi/sessions/*/*/wire.jsonl`
 
