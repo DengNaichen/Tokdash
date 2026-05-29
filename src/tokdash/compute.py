@@ -220,6 +220,9 @@ def parse_entries_json(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def period_to_days(period: str) -> int:
+    # ~100 years: a finite stand-in for "all time" that period_to_range_args can
+    # turn into a concrete --since/--until window covering every transcript.
+    ALL_TIME_DAYS = 36500
     try:
         return max(1, int(period))
     except ValueError:
@@ -229,8 +232,14 @@ def period_to_days(period: str) -> int:
             "week": 7,
             "14days": 14,
             "month": 30,
+            "year": 365,
+            "all": ALL_TIME_DAYS,
         }
-        return mapping.get(period, 1)
+        # Named periods we don't recognise previously fell through to 1 (today),
+        # which silently truncated `?period=all` / `?period=year` to a single day
+        # and looked like a massive undercount. Default to all-time instead so an
+        # unknown period over-reports (visibly wrong) rather than under-reports.
+        return mapping.get(period, ALL_TIME_DAYS)
 
 
 def period_to_range_args(period: str) -> list[str]:

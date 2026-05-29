@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
-from .compute import cache_hit_rate
+from .compute import cache_hit_rate, period_to_days
 from .dateutil import parse_date_range
 from .pricing import PricingDatabase
 
@@ -33,19 +33,12 @@ def reload_pricing_db() -> None:
 
 
 def _period_to_days(period: str) -> int:
-    try:
-        return max(1, int(period))
-    except ValueError:
-        mapping = {
-            "today": 1,
-            "3days": 3,
-            "week": 7,
-            "14days": 14,
-            "month": 30,
-            "90": 90,
-            "365": 365,
-        }
-        return mapping.get(period, 1)
+    """Delegate to the canonical mapping in ``compute`` so that ``/api/sessions``
+    and ``/api/usage`` agree on what named periods mean. Previously this had its
+    own copy that mapped ``year``/``all``/unknown to 1 (today), so e.g.
+    ``/api/sessions?period=all`` silently behaved like today while
+    ``/api/usage?period=all`` spanned all-time."""
+    return period_to_days(period)
 
 
 def _period_range(period: str) -> tuple[int, int]:

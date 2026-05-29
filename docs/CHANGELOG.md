@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+## 0.4.1 - 2026-05-30
+
+### Fixed
+- **`period=all` / `period=year` silently returned today only.** `period_to_days()` mapped every unrecognised named period — including `all` and `year` — to 1 day, so `/api/usage?period=all` and `?period=year` returned just the current day's data and looked like a large undercount. Named periods now resolve correctly (`year` → 365 days, `all` → all-time), and any unknown period defaults to all-time (which visibly over-reports) rather than collapsing to today. The dashboard UI was unaffected — it sends explicit `date_from`/`date_to` ranges — so this only bit direct API callers.
+- **`/api/sessions` and `/api/usage` disagreed on named periods.** `sessions.py` carried its own copy of the period→days mapping that still collapsed `year`/`all`/unknown to today, so `/api/sessions?period=all` behaved like today while `/api/usage?period=all` spanned all-time. `sessions` now delegates to the single canonical mapping in `compute`, keeping both endpoints consistent (with a regression test locking the alignment).
+
+### Changed
+- Polished the README header (English + 中文): the logo, tagline, badges, and demo callout are now centered, and the wordmark logo serves as the title (the redundant text heading was removed).
+
 ## 0.4.0 - 2026-05-29
 
 ### Added

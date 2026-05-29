@@ -4,6 +4,7 @@ from datetime import datetime
 from datetime import timedelta, timezone
 
 import tokdash.compute as compute
+import tokdash.sessions as sessions
 
 
 def test_get_session_data_month_vs_numeric_days(monkeypatch):
@@ -25,6 +26,36 @@ def test_get_session_data_month_vs_numeric_days(monkeypatch):
     assert compute.get_session_data("week") == {"range": "7d"}
 
     assert calls == [("month",), ("days", 30), ("days", 7)]
+
+
+def test_period_to_days_named_periods_do_not_collapse_to_today():
+    # Regression: "all"/"year" (and any unrecognised named period) previously fell
+    # through to 1 day, silently truncating ?period=all to today and looking like a
+    # massive undercount. They must map to a wide window instead.
+    assert compute.period_to_days("year") == 365
+    assert compute.period_to_days("all") > 365 * 50
+    assert compute.period_to_days("bogus") > 365 * 50
+    # Sanity: the known short periods are unchanged.
+    assert compute.period_to_days("today") == 1
+    assert compute.period_to_days("week") == 7
+    assert compute.period_to_days("14days") == 14
+
+
+def test_sessions_period_mapping_matches_compute():
+    # /api/sessions and /api/usage must agree on what named periods mean.
+    # sessions._period_to_days previously had its own copy that mapped
+    # year/all/unknown to today; it now delegates to compute.period_to_days.
+    for period in ("today", "week", "month", "year", "all", "14days", "90", "bogus"):
+        assert sessions._period_to_days(period) == compute.period_to_days(period)
+
+
+def test_period_to_range_args_all_spans_many_years():
+    args = compute.period_to_range_args("all")
+    assert args[:1] == ["--since"]
+    since = datetime.strptime(args[1], "%Y-%m-%d").date()
+    until = datetime.strptime(args[3], "%Y-%m-%d").date()
+    # The window should reach back far enough to cover any real transcript history.
+    assert (until - since).days > 365 * 50
 
 
 def test_period_to_range_args_month_is_calendar_month():

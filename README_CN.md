@@ -1,21 +1,27 @@
-[English](README.md) | [中文](README_CN.md)
+<p align="center">
+  <a href="README.md">English</a> &nbsp;|&nbsp; <a href="README_CN.md">中文</a>
+</p>
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/JingbiaoMei/tokdash/main/docs/assets/tokdash_logo_full.png" alt="Tokdash" width="420" />
 </p>
 
-# Tokdash
+<p align="center">
+  <b>适用于 AI 编程工具的本地 Token 与费用仪表盘</b><br/>
+  <sub>Codex · OpenCode · Claude Code · Gemini CLI · OpenClaw · Kimi CLI · pi-agent · GitHub Copilot CLI · Hermes 等</sub>
+</p>
 
-适用于 AI 编程工具（Codex、OpenCode、Claude Code、Gemini CLI、OpenClaw、Kimi CLI、pi-agent、GitHub Copilot CLI、Hermes 等）的本地 Token 与费用仪表盘。
+<p align="center">
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License" />
+  <a href="https://tokdash.github.io"><img src="https://img.shields.io/badge/%E5%9C%A8%E7%BA%BF%E4%BD%93%E9%AA%8C-tokdash.github.io-F59E0B?style=flat&logo=githubpages&logoColor=white" alt="在线体验" /></a>
+</p>
 
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green?style=flat)
-[![在线体验](https://img.shields.io/badge/在线体验-tokdash.github.io-F59E0B?style=flat&logo=githubpages&logoColor=white)](https://tokdash.github.io)
-
-> **无需安装即可体验 → [tokdash.github.io](https://tokdash.github.io)**
-> 完整 UI（主题、日期范围、会话、热力图）均可点击试用，数据由浏览器本地合成，
-> 不会上传任何信息。
+<p align="center">
+  <b>无需安装即可体验 → <a href="https://tokdash.github.io">tokdash.github.io</a></b><br/>
+  <sub>完整 UI（主题、日期范围、会话、热力图）均可点击试用，数据由浏览器本地合成，不会上传任何信息。</sub>
+</p>
 
 ## 功能特性
 

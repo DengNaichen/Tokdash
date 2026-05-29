@@ -1,21 +1,27 @@
-[English](README.md) | [中文](README_CN.md)
+<p align="center">
+  <a href="README.md">English</a> &nbsp;|&nbsp; <a href="README_CN.md">中文</a>
+</p>
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/JingbiaoMei/tokdash/main/docs/assets/tokdash_logo_full.png" alt="Tokdash" width="420" />
 </p>
 
-# Tokdash
+<p align="center">
+  <b>Local token &amp; cost dashboard for AI coding tools</b><br/>
+  <sub>Codex · OpenCode · Claude Code · Gemini CLI · OpenClaw · Kimi CLI · pi-agent · GitHub Copilot CLI · Hermes &amp; more</sub>
+</p>
 
-Local token & cost dashboard for AI coding tools (Codex, OpenCode, Claude Code, Gemini CLI, OpenClaw, Kimi CLI, pi-agent, GitHub Copilot CLI, Hermes, etc.).
+<p align="center">
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="License" />
+  <a href="https://tokdash.github.io"><img src="https://img.shields.io/badge/Live%20Demo-tokdash.github.io-F59E0B?style=flat&logo=githubpages&logoColor=white" alt="Live Demo" /></a>
+</p>
 
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green?style=flat)
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-tokdash.github.io-F59E0B?style=flat&logo=githubpages&logoColor=white)](https://tokdash.github.io)
-
-> **Try it without installing → [tokdash.github.io](https://tokdash.github.io)**
-> Click through the full UI (themes, date ranges, sessions, heatmap) backed by
-> in-browser synthetic data. Nothing is uploaded.
+<p align="center">
+  <b>Try it without installing → <a href="https://tokdash.github.io">tokdash.github.io</a></b><br/>
+  <sub>Click through the full UI (themes, date ranges, sessions, heatmap) backed by in-browser synthetic data — nothing is uploaded.</sub>
+</p>
 
 ## Table of Contents
 
