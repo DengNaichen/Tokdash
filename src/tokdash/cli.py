@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import webbrowser
 from pathlib import Path
 
 import uvicorn
@@ -60,6 +61,11 @@ def build_parser(prog: str) -> argparse.ArgumentParser:
         default=os.environ.get("TOKDASH_LOG_LEVEL", "info"),
         help="Uvicorn log level (default: info)",
     )
+    parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="Don't automatically open the browser",
+    )
 
     # Export options
     parser.add_argument(
@@ -86,9 +92,13 @@ def build_parser(prog: str) -> argparse.ArgumentParser:
     return parser
 
 
-def serve(host: str, port: int, log_level: str) -> None:
+def serve(host: str, port: int, log_level: str, open_browser: bool = True) -> None:
     url_host = "localhost" if host in {"0.0.0.0", "::"} else host
-    print(f"🚀 Starting Tokdash on http://{url_host}:{port}")
+    url = f"http://{url_host}:{port}"
+    print(f"🚀 Starting Tokdash on {url}")
+    # Auto-open browser after a short delay to allow server startup
+    if open_browser:
+        webbrowser.open(url)
     uvicorn.run(app, host=host, port=port, log_level=log_level)
 
 
@@ -108,7 +118,7 @@ def cli(argv: list[str] | None = None, prog: str = "tokdash") -> int:
 
     if args.command == "serve":
         port = args.port if args.port is not None else _default_port()
-        serve(args.bind, port, args.log_level)
+        serve(args.bind, port, args.log_level, open_browser=not args.no_open)
         return 0
 
     if args.command == "export":
