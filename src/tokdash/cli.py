@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import webbrowser
 from pathlib import Path
 
 import uvicorn
@@ -88,7 +89,10 @@ def build_parser(prog: str) -> argparse.ArgumentParser:
 
 def serve(host: str, port: int, log_level: str) -> None:
     url_host = "localhost" if host in {"0.0.0.0", "::"} else host
-    print(f"🚀 Starting Tokdash on http://{url_host}:{port}")
+    url = f"http://{url_host}:{port}"
+    print(f"🚀 Starting Tokdash on {url}")
+    # Auto-open browser after a short delay to allow server startup
+    webbrowser.open(url)
     uvicorn.run(app, host=host, port=port, log_level=log_level)
 
 
