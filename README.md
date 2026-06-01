@@ -45,6 +45,7 @@
 - [Privacy \& security](#privacy--security)
 - [API (local)](#api-local)
 - [Cost Accuracy Note](#cost-accuracy-note)
+- [History retention](#history-retention)
 - [Roadmap](#roadmap)
 - [Contributing / security](#contributing--security)
 - [Project structure](#project-structure)
@@ -267,6 +268,22 @@ Full API reference: [`docs/API.md`](docs/API.md) — schema, parameters, and res
 ## Cost Accuracy Note
 
 Token counts depend on what each client logs locally. Costs are computed from `src/tokdash/pricing_db.json` and may lag real provider pricing — use as an estimate and verify against your billing source if it matters.
+
+## History retention
+
+Tokdash reports usage by reading each client's **local** session logs — it keeps no store of its own. If a client deletes its old logs, those numbers disappear from Tokdash too, so a past month can read **lower than when you first recorded it**.
+
+The most common case is **Claude Code**, which deletes session transcripts older than `cleanupPeriodDays` (**default: 30 days**) on startup. Sessions you never return to are pruned once they age past that window (continuing a session — sending a new message — bumps its file's timestamp, so actively-used ones survive). To keep full history, **add** this key to your existing `~/.claude/settings.json` (don't replace the file) — and to any alternate `CLAUDE_CONFIG_DIR` you use:
+
+```json
+{
+  "cleanupPeriodDays": 3650
+}
+```
+
+This setting also governs cleanup of orphaned subagent worktrees, so a very large value keeps those around too — harmless in practice, but pick a window that comfortably exceeds the history you care about.
+
+> Other clients have their own retention behavior; when in doubt, back up the relevant log directory (e.g. `~/.claude/projects/`) if long-term history matters to you.
 
 ## Roadmap
 
