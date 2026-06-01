@@ -25,7 +25,7 @@ Goal: help the user install Tokdash and keep it running in the background for lo
 
    [Service]
    Type=simple
-   ExecStart=$TOKDASH_PATH serve --bind 127.0.0.1 --port 55423
+   ExecStart=$TOKDASH_PATH serve --bind 127.0.0.1 --port 55423 --no-open
    Restart=on-failure
    RestartSec=3
    Environment=PYTHONUNBUFFERED=1
@@ -53,6 +53,7 @@ Goal: help the user install Tokdash and keep it running in the background for lo
        <string>127.0.0.1</string>
        <string>--port</string>
        <string>55423</string>
+       <string>--no-open</string>
      </array>
      <key>RunAtLoad</key>
      <true/>

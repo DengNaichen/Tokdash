@@ -245,6 +245,8 @@ tokdash serve --bind 127.0.0.1 --port 55423
 tailscale serve --bg 55423
 ```
 
+By default `tokdash serve` opens the dashboard in your browser once on startup. Pass `--no-open` to disable this (it is also skipped automatically in headless/SSH environments and in the background service templates).
+
 ## Privacy & security
 
 - **No telemetry**: Tokdash does not intentionally send your data anywhere.

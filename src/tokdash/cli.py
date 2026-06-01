@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
+import threading
 import webbrowser
 from pathlib import Path
 
@@ -92,13 +94,47 @@ def build_parser(prog: str) -> argparse.ArgumentParser:
     return parser
 
 
+def _has_display() -> bool:
+    """Best-effort check for a usable GUI session.
+
+    Returns False in headless contexts (SSH sessions, systemd/launchd services,
+    CI) so we don't try to launch a browser where there is no display to open
+    it on. ``--no-open`` remains the explicit hard override on top of this.
+    """
+    # A remote shell with no local console: opening a browser is wrong here
+    # even on macOS/Windows.
+    if os.environ.get("SSH_CONNECTION") or os.environ.get("SSH_TTY"):
+        return False
+    # On Linux a GUI needs an X11 or Wayland display. macOS and Windows don't
+    # expose these vars but do have a desktop session, so only gate on Linux.
+    if sys.platform.startswith("linux"):
+        return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+    return True
+
+
+def _open_browser(url: str) -> None:
+    """Open ``url`` in a browser, swallowing any error.
+
+    Opening a browser is a best-effort convenience; a missing/misconfigured
+    browser must never take down the server.
+    """
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+
+
 def serve(host: str, port: int, log_level: str, open_browser: bool = True) -> None:
     url_host = "localhost" if host in {"0.0.0.0", "::"} else host
     url = f"http://{url_host}:{port}"
     print(f"🚀 Starting Tokdash on {url}")
-    # Auto-open browser after a short delay to allow server startup
-    if open_browser:
-        webbrowser.open(url)
+    # Open the browser only when explicitly enabled (--no-open is a hard
+    # override) and a GUI is actually available. Fire it from a short-delay
+    # daemon timer so the server has a moment to start listening first.
+    if open_browser and _has_display():
+        timer = threading.Timer(1.0, _open_browser, args=(url,))
+        timer.daemon = True
+        timer.start()
     uvicorn.run(app, host=host, port=port, log_level=log_level)
 
 

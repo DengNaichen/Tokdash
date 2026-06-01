@@ -11,7 +11,8 @@ Type=simple
 #
 # If you installed in a venv, it is typically:
 #   /path/to/venv/bin/tokdash
-ExecStart=%h/.local/bin/tokdash serve --bind 127.0.0.1 --port 55423
+# `--no-open` keeps the headless service from trying to launch a browser.
+ExecStart=%h/.local/bin/tokdash serve --bind 127.0.0.1 --port 55423 --no-open
 
 Restart=on-failure
 RestartSec=3

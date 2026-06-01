@@ -29,7 +29,7 @@ mkdir -p ~/.config/systemd/user
 cp docs/agents/systemd/templates/tokdash.service ~/.config/systemd/user/tokdash.service
 ```
 
-Edit `ExecStart=` to point at your `tokdash` binary (or set it to an absolute path to your venv binary).
+Edit `ExecStart=` to point at your `tokdash` binary (or set it to an absolute path to your venv binary). The template passes `--no-open` because the service runs headless and should not try to launch a browser.
 
 ### 3) Enable + start
 
@@ -80,7 +80,7 @@ mkdir -p ~/Library/LaunchAgents
 cp docs/agents/systemd/templates/com.tokdash.tokdash.plist ~/Library/LaunchAgents/com.tokdash.tokdash.plist
 ```
 
-Edit the plist to set the correct `ProgramArguments` path for your `tokdash` binary and adjust `--bind/--port` as desired.
+Edit the plist to set the correct `ProgramArguments` path for your `tokdash` binary and adjust `--bind/--port` as desired. The template passes `--no-open` so the headless agent does not try to launch a browser.
 
 ### 3) Load + start
 

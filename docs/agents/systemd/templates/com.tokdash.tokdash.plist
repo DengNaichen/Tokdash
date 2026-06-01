@@ -19,6 +19,8 @@
       <string>127.0.0.1</string>
       <string>--port</string>
       <string>55423</string>
+      <!-- Headless service: don't try to launch a browser. -->
+      <string>--no-open</string>
     </array>
 
     <key>EnvironmentVariables</key>

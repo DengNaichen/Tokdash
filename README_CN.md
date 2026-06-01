@@ -222,6 +222,8 @@ tokdash serve --bind 127.0.0.1 --port 55423
 tailscale serve --bg 55423
 ```
 
+默认情况下，`tokdash serve` 会在启动时自动在浏览器中打开仪表盘一次。使用 `--no-open` 可禁用此行为（在无界面/SSH 环境以及后台服务模板中也会自动跳过）。
+
 ## 隐私与安全
 
 - **无遥测**：Tokdash 不会主动把你的数据发送到任何地方。
