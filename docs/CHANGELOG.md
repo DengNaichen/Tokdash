@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+## 0.5.1 - 2026-06-01
+
+### Added
+- **`tokdash serve` now opens the dashboard in your browser on startup**, with a new `--no-open` flag to disable it. Auto-open is skipped automatically in headless contexts — CI (`CI` env var), SSH sessions (`SSH_CONNECTION`/`SSH_TTY`), and Linux without an X11/Wayland display — and the bundled systemd/launchd service templates now pass `--no-open`. The browser launch fires from a short-delay daemon timer so the server is listening before the page loads, and any failure to open is swallowed so it can never take down the server. (Thanks @KurokawaShiorei for the original contribution in #5.)
+
 ## 0.5.0 - 2026-05-30
 
 ### Added
