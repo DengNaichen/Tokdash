@@ -8,17 +8,18 @@ Before tagging:
 
 1. Ensure `pyproject.toml` and `src/tokdash/__init__.py` have the same version.
 2. Update `docs/CHANGELOG.md` with a new `## X.Y.Z - YYYY-MM-DD` section.
-3. Ensure the worktree is clean except for intended release changes.
-4. Run the test suite:
+3. If `README.md` changed this release, mirror the changes into `README_CN.md` so the English and 中文 READMEs stay in sync (sections, flags, and examples should match).
+4. Ensure the worktree is clean except for intended release changes.
+5. Run the test suite:
    ```bash
    PYTHONPATH=src python3 -m pytest
    ```
-5. Build the package locally:
+6. Build the package locally:
    ```bash
    python3 -m build
    ```
-6. Confirm the release tag does not already exist locally or on `origin`.
-7. Tag the current `HEAD` only, never an older commit.
+7. Confirm the release tag does not already exist locally or on `origin`.
+8. Tag the current `HEAD` only, never an older commit.
 
 ## Release sequence
 
