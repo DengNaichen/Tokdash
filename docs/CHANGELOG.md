@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+## 0.5.5 - 2026-06-05
+
+### Fixed
+- Pricing lookup now strips common quantization and precision suffixes such as `-FP8`, `-FP16`, `-INT8`, and `-AWQ`, so provider IDs like `vllm-hpc/qwen3.6-27B-FP8` resolve to the base model price instead of showing as zero-cost.
+
 ## 0.5.4 - 2026-06-03
 
 ### Added

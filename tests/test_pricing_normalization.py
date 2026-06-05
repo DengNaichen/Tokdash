@@ -21,6 +21,22 @@ def test_pricing_lookup_strips_release_date_suffixes():
     assert abs(base - dated) < 1e-12
 
 
+def test_pricing_lookup_strips_quantization_suffixes():
+    db = PricingDatabase()
+
+    base = db.get_cost("qwen3.6-27b", 1000, 2000, 0, 0)
+    fp8 = db.get_cost("vllm-hpc/qwen3.6-27B-FP8", 1000, 2000, 0, 0)
+    fp16 = db.get_cost("qwen3.6-27B-FP16", 1000, 2000, 0, 0)
+    int8 = db.get_cost("qwen3.6-27B-INT8", 1000, 2000, 0, 0)
+    awq = db.get_cost("qwen3.6-27B-AWQ", 1000, 2000, 0, 0)
+
+    assert base > 0.0
+    assert abs(base - fp8) < 1e-12
+    assert abs(base - fp16) < 1e-12
+    assert abs(base - int8) < 1e-12
+    assert abs(base - awq) < 1e-12
+
+
 def test_pricing_lookup_supports_kimi_k2p5_aliases():
     db = PricingDatabase()
 
