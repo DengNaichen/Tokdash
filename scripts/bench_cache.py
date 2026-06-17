@@ -9,7 +9,6 @@ Or if not installed editable:
 """
 
 import sys
-import os
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -19,7 +18,7 @@ _src = str(Path(__file__).resolve().parent.parent / "src")
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from tokdash.sources.coding_tools import BaseParser, CodingToolsUsageTracker
+from tokdash.sources.coding_tools import BaseParser, CodingToolsUsageTracker  # noqa: E402
 
 
 def _clear_caches():
@@ -65,7 +64,7 @@ def main():
 
     # --- Warm run, another range ---
     print("\n4) Warm run, 3-day range:")
-    t_warm_3d = bench_collect("last 3 days", three_days_ago, now)
+    bench_collect("last 3 days", three_days_ago, now)
 
     # --- compute_usage_with_comparison (calls collect twice internally) ---
     _clear_caches()

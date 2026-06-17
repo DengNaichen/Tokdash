@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## Unreleased
 
+## 0.6.1 - 2026-06-17
+
+### Changed
+- Made Claude session reads much faster by merging stored session records in one pass instead of repeatedly re-sorting and de-duplicating resumed sessions.
+- Made OpenCode session reads much faster by pushing date windows into OpenCode's native SQLite query and extracting token/model fields with SQLite JSON functions, with raw JSON fallback when needed.
+
+### Fixed
+- Added regression coverage for Claude same-timestamp session merge ordering and OpenCode session window boundaries, malformed JSON handling, multi-session fallback, and API window propagation.
+
 ## 0.6.0 - 2026-06-16
 
 ### Added

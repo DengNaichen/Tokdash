@@ -484,19 +484,201 @@ def _opencode_db_signature() -> tuple[tuple[str, int, int], ...]:
 
 
 @lru_cache(maxsize=8)
-def _load_opencode_sessions(signature: tuple[tuple[str, int, int], ...], _pricing_sig: tuple = ()) -> Dict[str, Dict[str, Any]]:
+def _load_opencode_sessions(
+    signature: tuple[tuple[str, int, int], ...],
+    _pricing_sig: tuple = (),
+    since_ms: Optional[int] = None,
+    until_ms: Optional[int] = None,
+) -> Dict[str, Dict[str, Any]]:
     if not signature:
         return {}
     db_path = Path(signature[0][0])
     if not db_path.exists():
         return {}
 
+    try:
+        return _load_opencode_sessions_scalar(db_path, since_ms=since_ms, until_ms=until_ms)
+    except sqlite3.Error:
+        return _load_opencode_sessions_raw_json(db_path, since_ms=since_ms, until_ms=until_ms)
+
+
+def _opencode_window_clause(since_ms: Optional[int], until_ms: Optional[int]) -> tuple[str, list[int]]:
+    where: list[str] = []
+    args: list[int] = []
+    if since_ms is not None:
+        where.append("m.time_created >= ?")
+        args.append(int(since_ms))
+    if until_ms is not None:
+        where.append("m.time_created < ?")
+        args.append(int(until_ms))
+    return (" WHERE " + " AND ".join(where)) if where else "", args
+
+
+def _opencode_project_path(directory: Any, worktree: Any, cwd: Any = "", root: Any = "") -> str:
+    project_path = str(worktree or "")
+    if not project_path or project_path == "/":
+        project_path = str(directory or "")
+    if not project_path or project_path == "/":
+        project_path = str(cwd or root or "")
+    return project_path
+
+
+def _append_opencode_turn(
+    sessions: Dict[str, Dict[str, Any]],
+    turn_index_by_session: Dict[str, int],
+    *,
+    session_id: Any,
+    directory: Any,
+    worktree: Any,
+    created_ms: Any,
+    model: Any,
+    provider: Any,
+    fresh_input: Any,
+    cache_write: Any,
+    cache_read: Any,
+    output_tokens: Any,
+    reasoning_tokens: Any,
+    cwd: Any = "",
+    root: Any = "",
+) -> None:
+    fresh_input = int(fresh_input or 0)
+    cache_write = int(cache_write or 0)
+    cache_read = int(cache_read or 0)
+    output_tokens = int(output_tokens or 0)
+    reasoning_tokens = int(reasoning_tokens or 0)
+    input_tokens = fresh_input + cache_write
+    total_tokens = input_tokens + cache_read + output_tokens + reasoning_tokens
+    if total_tokens == 0:
+        return
+
+    model = str(model or "unknown")
+    provider = str(provider or "")
+    full_model_name = f"{provider}/{model}" if provider else model
+    project_path = _opencode_project_path(directory, worktree, cwd, root)
+    sid = str(session_id)
+
+    raw = sessions.setdefault(
+        sid,
+        {
+            "tool": "opencode",
+            "session_id": sid,
+            "project": _project_from_repo_or_path(None, project_path or None),
+            "turns": [],
+        },
+    )
+    if raw.get("project") == "unknown":
+        raw["project"] = _project_from_repo_or_path(None, project_path or None)
+
+    turn_index = turn_index_by_session.get(sid, 0) + 1
+    turn_index_by_session[sid] = turn_index
+    raw["turns"].append(
+        _build_turn(
+            turn_index=turn_index,
+            timestamp_ms=int(created_ms or 0),
+            model=model,
+            tokens_in=input_tokens,
+            tokens_cache=cache_read,
+            tokens_out=output_tokens,
+            tokens_reasoning=reasoning_tokens,
+            cost=_PRICING_DB.get_cost(full_model_name, input_tokens, output_tokens, cache_read, 0),
+        )
+    )
+
+
+def _load_opencode_sessions_scalar(
+    db_path: Path,
+    *,
+    since_ms: Optional[int] = None,
+    until_ms: Optional[int] = None,
+) -> Dict[str, Dict[str, Any]]:
+    window_clause, args = _opencode_window_clause(since_ms, until_ms)
+    role_clause = "json_valid(m.data) AND json_extract(m.data, '$.role') = 'assistant'"
+    if window_clause:
+        where_clause = f"{window_clause} AND {role_clause}"
+    else:
+        where_clause = f" WHERE {role_clause}"
+
     sessions: Dict[str, Dict[str, Any]] = {}
     conn = sqlite3.connect(str(db_path))
     try:
         cur = conn.cursor()
         cur.execute(
-            """
+            f"""
+            SELECT
+              s.id,
+              s.directory,
+              COALESCE(p.worktree, ''),
+              m.time_created,
+              json_extract(m.data, '$.tokens.input'),
+              json_extract(m.data, '$.tokens.cache.write'),
+              json_extract(m.data, '$.tokens.cache.read'),
+              json_extract(m.data, '$.tokens.output'),
+              json_extract(m.data, '$.tokens.reasoning'),
+              json_extract(m.data, '$.modelID'),
+              json_extract(m.data, '$.providerID'),
+              json_extract(m.data, '$.path.cwd'),
+              json_extract(m.data, '$.path.root')
+            FROM message m
+            JOIN session s ON m.session_id = s.id
+            LEFT JOIN project p ON s.project_id = p.id
+            {where_clause}
+            ORDER BY m.time_created ASC
+            """,
+            args,
+        )
+        turn_index_by_session: Dict[str, int] = {}
+        for (
+            session_id,
+            directory,
+            worktree,
+            created_ms,
+            fresh_input,
+            cache_write,
+            cache_read,
+            output_tokens,
+            reasoning_tokens,
+            model,
+            provider,
+            cwd,
+            root,
+        ) in cur.fetchall():
+            _append_opencode_turn(
+                sessions,
+                turn_index_by_session,
+                session_id=session_id,
+                directory=directory,
+                worktree=worktree,
+                created_ms=created_ms,
+                model=model,
+                provider=provider,
+                fresh_input=fresh_input,
+                cache_write=cache_write,
+                cache_read=cache_read,
+                output_tokens=output_tokens,
+                reasoning_tokens=reasoning_tokens,
+                cwd=cwd,
+                root=root,
+            )
+    finally:
+        conn.close()
+
+    return sessions
+
+
+def _load_opencode_sessions_raw_json(
+    db_path: Path,
+    *,
+    since_ms: Optional[int] = None,
+    until_ms: Optional[int] = None,
+) -> Dict[str, Dict[str, Any]]:
+    window_clause, args = _opencode_window_clause(since_ms, until_ms)
+
+    sessions: Dict[str, Dict[str, Any]] = {}
+    conn = sqlite3.connect(str(db_path))
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
             SELECT
               s.id,
               s.directory,
@@ -506,8 +688,10 @@ def _load_opencode_sessions(signature: tuple[tuple[str, int, int], ...], _pricin
             FROM message m
             JOIN session s ON m.session_id = s.id
             LEFT JOIN project p ON s.project_id = p.id
+            {window_clause}
             ORDER BY m.time_created ASC
-            """
+            """,
+            args,
         )
         turn_index_by_session: Dict[str, int] = {}
         for session_id, directory, worktree, created_ms, data_json in cur.fetchall():
@@ -524,53 +708,23 @@ def _load_opencode_sessions(signature: tuple[tuple[str, int, int], ...], _pricin
                 continue
 
             cache = tokens.get("cache") if isinstance(tokens.get("cache"), dict) else {}
-            fresh_input = int(tokens.get("input", 0) or 0)
-            cache_write = int(cache.get("write", 0) or 0)
-            cache_read = int(cache.get("read", 0) or 0)
-            output_tokens = int(tokens.get("output", 0) or 0)
-            reasoning_tokens = int(tokens.get("reasoning", 0) or 0)
-            input_tokens = fresh_input + cache_write
-            total_tokens = input_tokens + cache_read + output_tokens + reasoning_tokens
-            if total_tokens == 0:
-                continue
-
-            model = str(data.get("modelID") or "unknown")
-            provider = str(data.get("providerID") or "")
-            full_model_name = f"{provider}/{model}" if provider else model
-
-            project_path = str(worktree or "")
-            if not project_path or project_path == "/":
-                project_path = str(directory or "")
-            if not project_path or project_path == "/":
-                path_info = data.get("path") if isinstance(data.get("path"), dict) else {}
-                project_path = str(path_info.get("cwd") or path_info.get("root") or "")
-
-            raw = sessions.setdefault(
-                str(session_id),
-                {
-                    "tool": "opencode",
-                    "session_id": str(session_id),
-                    "project": _project_from_repo_or_path(None, project_path or None),
-                    "turns": [],
-                },
-            )
-            if raw.get("project") == "unknown":
-                raw["project"] = _project_from_repo_or_path(None, project_path or None)
-
-            turn_index = turn_index_by_session.get(str(session_id), 0) + 1
-            turn_index_by_session[str(session_id)] = turn_index
-
-            raw["turns"].append(
-                _build_turn(
-                    turn_index=turn_index,
-                    timestamp_ms=int(created_ms or 0),
-                    model=model,
-                    tokens_in=input_tokens,
-                    tokens_cache=cache_read,
-                    tokens_out=output_tokens,
-                    tokens_reasoning=reasoning_tokens,
-                    cost=_PRICING_DB.get_cost(full_model_name, input_tokens, output_tokens, cache_read, 0),
-                )
+            path_info = data.get("path") if isinstance(data.get("path"), dict) else {}
+            _append_opencode_turn(
+                sessions,
+                turn_index_by_session,
+                session_id=session_id,
+                directory=directory,
+                worktree=worktree,
+                created_ms=created_ms,
+                model=data.get("modelID"),
+                provider=data.get("providerID"),
+                fresh_input=tokens.get("input", 0),
+                cache_write=cache.get("write", 0),
+                cache_read=cache.get("read", 0),
+                output_tokens=tokens.get("output", 0),
+                reasoning_tokens=tokens.get("reasoning", 0),
+                cwd=path_info.get("cwd"),
+                root=path_info.get("root"),
             )
     finally:
         conn.close()
@@ -578,14 +732,18 @@ def _load_opencode_sessions(signature: tuple[tuple[str, int, int], ...], _pricin
     return sessions
 
 
-def _opencode_sessions() -> Dict[str, Dict[str, Any]]:
+def _opencode_sessions(since_ms: Optional[int] = None, until_ms: Optional[int] = None) -> Dict[str, Dict[str, Any]]:
     signature = _opencode_db_signature()
     if not signature:
         return {}
-    return _load_opencode_sessions(signature, _pricing_signature())
+    return _load_opencode_sessions(signature, _pricing_signature(), since_ms, until_ms)
 
 
-def _raw_sessions_for_tool(tool: str) -> Dict[str, Dict[str, Any]]:
+def _raw_sessions_for_tool(
+    tool: str,
+    since_ms: Optional[int] = None,
+    until_ms: Optional[int] = None,
+) -> Dict[str, Dict[str, Any]]:
     key = str(tool or "").strip().lower()
     if key in {"codex", "claude"} and persistent_usage_db_enabled():
         try:
@@ -597,12 +755,25 @@ def _raw_sessions_for_tool(tool: str) -> Dict[str, Dict[str, Any]]:
     if key == "claude":
         return _claude_sessions()
     if key == "opencode":
-        return _opencode_sessions()
+        return _opencode_sessions(since_ms=since_ms, until_ms=until_ms)
     raise ValueError(f"Unsupported session tool: {tool}")
+
+
+def _turn_identity_key(turn: Dict[str, Any]) -> tuple[int, str, int, int, int, int, float]:
+    return (
+        int(turn.get("timestamp_ms", 0) or 0),
+        str(turn.get("model") or "unknown"),
+        int(turn.get("tokens_in", 0) or 0),
+        int(turn.get("tokens_cache", 0) or 0),
+        int(turn.get("tokens_out", 0) or 0),
+        int(turn.get("tokens_reasoning", 0) or 0),
+        round(float(turn.get("cost", 0.0) or 0.0), 8),
+    )
 
 
 def _session_records_to_raw_sessions(tool: str, records: Iterable[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     sessions: Dict[str, Dict[str, Any]] = {}
+    seen_turns: dict[str, set[tuple[int, str, int, int, int, int, float]]] = {}
     for raw in records:
         session_id = str(raw.get("session_id") or "")
         if not session_id:
@@ -611,10 +782,34 @@ def _session_records_to_raw_sessions(tool: str, records: Iterable[Dict[str, Any]
             # Match the live Codex loader: sorted files with the same session_id
             # are not merged; the later record wins.
             sessions[session_id] = raw
-        elif session_id in sessions:
-            sessions[session_id] = _merge_raw_session(sessions[session_id], raw)
-        else:
-            sessions[session_id] = raw
+            continue
+
+        session = sessions.get(session_id)
+        if session is None:
+            session = dict(raw)
+            session["tool"] = session.get("tool") or tool
+            session["session_id"] = session_id
+            session["project"] = session.get("project") or "unknown"
+            session["turns"] = []
+            sessions[session_id] = session
+            seen_turns[session_id] = set()
+        elif session.get("project") == "unknown" and raw.get("project"):
+            session["project"] = raw.get("project")
+
+        seen = seen_turns[session_id]
+        for turn in raw.get("turns", []):
+            key = _turn_identity_key(turn)
+            if key in seen:
+                continue
+            seen.add(key)
+            session["turns"].append(dict(turn))
+
+    for session in sessions.values():
+        if tool == "codex":
+            continue
+        session["turns"].sort(key=lambda item: (int(item.get("timestamp_ms", 0) or 0), int(item.get("turn_index", 0) or 0)))
+        for turn_index, turn in enumerate(session["turns"], start=1):
+            turn["turn_index"] = turn_index
     return sessions
 
 
@@ -666,7 +861,9 @@ def get_sessions_data(tool: str, period: str, date_from: Optional[str] = None, d
         since_ms, until_ms = _period_range(period)
 
     sessions = []
-    for raw in _raw_sessions_for_tool(key).values():
+    window_since_ms = since_ms if key == "opencode" else None
+    window_until_ms = until_ms if key == "opencode" else None
+    for raw in _raw_sessions_for_tool(key, since_ms=window_since_ms, until_ms=window_until_ms).values():
         summary = _summarize_session(raw, since_ms=since_ms, until_ms=until_ms)
         if summary:
             sessions.append(summary)

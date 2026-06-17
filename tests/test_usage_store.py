@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import sqlite3
+
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -449,6 +452,247 @@ def test_codex_stored_session_duplicate_policy_matches_live_loader():
 
     assert result["dup"]["project"] == "new"
     assert result["dup"]["turns"] == [{"tokens": 20}]
+
+
+def test_claude_stored_session_records_merge_in_one_pass_matches_legacy_semantics():
+    records = [
+        {
+            "tool": "claude",
+            "session_id": "shared",
+            "project": "unknown",
+            "turns": [
+                {"turn_index": 1, "timestamp_ms": 1000, "model": "claude", "tokens_in": 1, "tokens_cache": 2, "tokens_out": 3, "tokens_reasoning": 0, "cost": 0.01},
+                {"turn_index": 2, "timestamp_ms": 3000, "model": "claude", "tokens_in": 10, "tokens_cache": 0, "tokens_out": 1, "tokens_reasoning": 0, "cost": 0.02},
+            ],
+        },
+        {
+            "tool": "claude",
+            "session_id": "shared",
+            "project": "tokdash",
+            "turns": [
+                {"turn_index": 1, "timestamp_ms": 1000, "model": "claude", "tokens_in": 1, "tokens_cache": 2, "tokens_out": 3, "tokens_reasoning": 0, "cost": 0.01},
+                {"turn_index": 2, "timestamp_ms": 2000, "model": "claude", "tokens_in": 4, "tokens_cache": 5, "tokens_out": 6, "tokens_reasoning": 0, "cost": 0.03},
+            ],
+        },
+    ]
+
+    expected = records[0]
+    expected = sessions_module._merge_raw_session(expected, records[1])
+    result = sessions_module._session_records_to_raw_sessions("claude", records)
+
+    assert result["shared"] == expected
+
+
+def test_claude_stored_session_merge_documents_same_timestamp_tie_behavior():
+    records = [
+        {
+            "tool": "claude",
+            "session_id": "shared",
+            "project": "",
+            "turns": [
+                {"turn_index": 2, "timestamp_ms": 1000, "model": "claude", "tokens_in": 2, "tokens_cache": 0, "tokens_out": 0, "tokens_reasoning": 0, "cost": 0.02}
+            ],
+        },
+        {
+            "tool": "claude",
+            "session_id": "shared",
+            "project": "tokdash",
+            "turns": [
+                {"turn_index": 1, "timestamp_ms": 1000, "model": "claude", "tokens_in": 1, "tokens_cache": 0, "tokens_out": 0, "tokens_reasoning": 0, "cost": 0.01}
+            ],
+        },
+        {
+            "tool": "claude",
+            "session_id": "shared",
+            "project": "ignored",
+            "turns": [
+                {"turn_index": 3, "timestamp_ms": 1000, "model": "claude", "tokens_in": 3, "tokens_cache": 0, "tokens_out": 0, "tokens_reasoning": 0, "cost": 0.03}
+            ],
+        },
+    ]
+
+    result = sessions_module._session_records_to_raw_sessions("claude", records)["shared"]
+
+    assert result["project"] == "tokdash"
+    assert [turn["tokens_in"] for turn in result["turns"]] == [1, 2, 3]
+    assert [turn["turn_index"] for turn in result["turns"]] == [1, 2, 3]
+    assert sum(turn["tokens_in"] for turn in result["turns"]) == 6
+
+
+def _create_opencode_session_db(db_path: Path) -> tuple[tuple[str, int, int], ...]:
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE project(id TEXT PRIMARY KEY, worktree TEXT);
+            CREATE TABLE session(id TEXT PRIMARY KEY, project_id TEXT, directory TEXT);
+            CREATE TABLE message(id TEXT PRIMARY KEY, session_id TEXT, time_created INTEGER, data TEXT);
+            """
+        )
+        conn.execute("INSERT INTO project(id, worktree) VALUES('p1', '/workspace/tokdash')")
+        conn.execute("INSERT INTO project(id, worktree) VALUES('p2', '/workspace/other')")
+        conn.execute("INSERT INTO session(id, project_id, directory) VALUES('s1', 'p1', '/tmp/fallback')")
+        conn.execute("INSERT INTO session(id, project_id, directory) VALUES('s2', 'p2', '/tmp/other')")
+        messages = [
+            (
+                "before",
+                "s1",
+                900,
+                {
+                    "role": "assistant",
+                    "modelID": "glm-5.2",
+                    "providerID": "zai",
+                    "tokens": {"input": 1, "output": 2, "reasoning": 0, "cache": {"write": 0, "read": 0}},
+                },
+            ),
+            (
+                "at_since",
+                "s1",
+                1000,
+                {
+                    "role": "assistant",
+                    "modelID": "glm-5.2",
+                    "providerID": "zai",
+                    "tokens": {"input": 2, "output": 1, "reasoning": 0, "cache": {"write": 0, "read": 0}},
+                },
+            ),
+            (
+                "inside",
+                "s1",
+                1500,
+                {
+                    "role": "assistant",
+                    "modelID": "glm-5.2",
+                    "providerID": "zai",
+                    "path": {"cwd": "/ignored/cwd"},
+                    "tokens": {"input": 10, "output": 5, "reasoning": 6, "cache": {"write": 3, "read": 4}},
+                },
+            ),
+            (
+                "user",
+                "s1",
+                1600,
+                {
+                    "role": "user",
+                    "modelID": "glm-5.2",
+                    "providerID": "zai",
+                    "tokens": {"input": 100, "output": 100, "cache": {"write": 0, "read": 0}},
+                },
+            ),
+            (
+                "at_until",
+                "s1",
+                2000,
+                {
+                    "role": "assistant",
+                    "modelID": "glm-5.2",
+                    "providerID": "zai",
+                    "tokens": {"input": 7, "output": 1, "reasoning": 0, "cache": {"write": 0, "read": 0}},
+                },
+            ),
+            (
+                "other_inside",
+                "s2",
+                1500,
+                {
+                    "role": "assistant",
+                    "modelID": "glm-5.2",
+                    "providerID": "zai",
+                    "tokens": {"input": 4, "output": 2, "reasoning": 0, "cache": {"write": 1, "read": 0}},
+                },
+            ),
+        ]
+        conn.executemany(
+            "INSERT INTO message(id, session_id, time_created, data) VALUES (?, ?, ?, ?)",
+            [(msg_id, session_id, ts, json.dumps(data)) for msg_id, session_id, ts, data in messages],
+        )
+        conn.execute(
+            "INSERT INTO message(id, session_id, time_created, data) VALUES (?, ?, ?, ?)",
+            ("malformed", "s1", 1700, "{not valid json"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    stat = db_path.stat()
+    return ((str(db_path), stat.st_mtime_ns, stat.st_size),)
+
+
+def test_opencode_session_loaders_use_sql_window_and_match_raw_json_fallback(tmp_path):
+    db_path = tmp_path / "opencode.db"
+    signature = _create_opencode_session_db(db_path)
+
+    sessions_module._load_opencode_sessions.cache_clear()
+    scalar = sessions_module._load_opencode_sessions(signature, (), 1000, 2000)
+    raw = sessions_module._load_opencode_sessions_raw_json(db_path, since_ms=1000, until_ms=2000)
+    all_rows = sessions_module._load_opencode_sessions_raw_json(db_path)
+
+    assert scalar == raw
+    assert set(scalar) == {"s1", "s2"}
+    assert len(all_rows["s1"]["turns"]) == 4
+    assert len(scalar["s1"]["turns"]) == 2
+    assert [turn["timestamp_ms"] for turn in scalar["s1"]["turns"]] == [1000, 1500]
+    turn = next(turn for turn in scalar["s1"]["turns"] if turn["timestamp_ms"] == 1500)
+    assert scalar["s1"]["project"] == "tokdash"
+    assert scalar["s2"]["project"] == "other"
+    assert turn["tokens_in"] == 13
+    assert turn["tokens_cache"] == 4
+    assert turn["tokens_out"] == 5
+    assert turn["tokens_reasoning"] == 6
+    assert turn["tokens"] == 28
+
+
+def test_opencode_loader_falls_back_to_raw_json_when_scalar_query_fails(monkeypatch, tmp_path):
+    db_path = tmp_path / "opencode.db"
+    signature = _create_opencode_session_db(db_path)
+
+    def fail_scalar(*_args, **_kwargs):
+        raise sqlite3.OperationalError("no such function: json_extract")
+
+    monkeypatch.setattr(sessions_module, "_load_opencode_sessions_scalar", fail_scalar)
+    sessions_module._load_opencode_sessions.cache_clear()
+
+    result = sessions_module._load_opencode_sessions(signature, (), 1000, 2000)
+
+    assert set(result) == {"s1", "s2"}
+    assert [turn["timestamp_ms"] for turn in result["s1"]["turns"]] == [1000, 1500]
+    assert len(result["s2"]["turns"]) == 1
+
+
+def test_get_sessions_data_passes_period_window_to_opencode_loader(monkeypatch):
+    captured = {}
+
+    def fake_opencode_sessions(*, since_ms=None, until_ms=None):
+        captured["since_ms"] = since_ms
+        captured["until_ms"] = until_ms
+        return {
+            "s1": {
+                "tool": "opencode",
+                "session_id": "s1",
+                "project": "tokdash",
+                "turns": [
+                    sessions_module._build_turn(
+                        turn_index=1,
+                        timestamp_ms=int(since_ms or 0),
+                        model="model",
+                        tokens_in=1,
+                        tokens_cache=0,
+                        tokens_out=1,
+                        tokens_reasoning=0,
+                        cost=0.0,
+                    )
+                ],
+            }
+        }
+
+    monkeypatch.setattr(sessions_module, "_opencode_sessions", fake_opencode_sessions)
+
+    result = sessions_module.get_sessions_data("opencode", "today")
+
+    assert captured["since_ms"] is not None
+    assert captured["until_ms"] is not None
+    assert captured["since_ms"] < captured["until_ms"]
+    assert result["summary"]["session_count"] == 1
 
 
 def test_opencode_signatures_include_wal_and_shm(monkeypatch, tmp_path):
